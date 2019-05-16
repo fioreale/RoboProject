@@ -96,7 +96,7 @@ class Odometry {
 		return odom_type;
 	}
 
-	
+
 
 	void diff_drive(double vl, double vr, double delta_t) {
 		//computation of the Differential Drive odometry
@@ -144,6 +144,8 @@ class Odometry {
 
 	void ackerman(double vl, double vr, double steering_angle, double delta_t) {
 		steering_angle *= M_PI / (180 * 18);
+		double steering_angle_l;
+		double steering_angle_r;
 
 		double old_x = get_x();
 		double old_y = get_y();
@@ -160,6 +162,12 @@ class Odometry {
 		double new_y = old_y + d_y;
 		double new_theta = fmod(old_theta + d_theta,2*M_PI);
 
+		double x_fr, y_fr, x_br, y_br;
+
+		double x_fl, y_fl, x_bl, y_bl;
+
+		double axis_x, axis_y;
+
 		set_x(new_x);
 		set_y(new_y);
 		set_theta(new_theta);
@@ -173,8 +181,48 @@ class Odometry {
 		tf_car.setRotation(q);
 		tf_wheel_fl.setRotation(q);
 		tf_wheel_fr.setRotation(q);
+
+		x_bl = new_x - 1.3/2*cos(new_theta);
+		y_bl = new_y - 1.3/2*sin(new_theta);
+
+		tf_wheel_bl.setOrigin(tf::Vector3(x_bl, y_bl, 0));
 		tf_wheel_bl.setRotation(q);
+
+		x_br = new_x + 1.3/2*cos(new_theta);
+		y_br = new_y + 1.3/2*sin(new_theta);
+
+		tf_wheel_br.setOrigin(tf::Vector3(x_br, y_br, 0));
 		tf_wheel_br.setRotation(q);
+
+		axis_x = d*cos(new_theta);
+		axis_y = d*sin(new_theta);
+
+		x_fr = x_br + axis_x;
+		y_fr = y_br + axis_y;
+
+		x_fl = x_bl + axis_x;
+		y_fl = y_bl + axis_y;
+
+		tf::Quaternion q_fr;
+		tf::Quaternion q_fl;
+
+		if(steering_angle>0){
+			steering_angle_l = atan(d/(R + b));
+			steering_angle_r = atan(d/(R - b));
+		}
+		else{
+			steering_angle_l = atan(d/(R - b));
+			steering_angle_r = atan(d/(R + b));
+		}
+		
+		q_fr.setRPY(0, 0, new_theta - steering_angle_r);
+		q_fl.setRPY(0, 0, new_theta - steering_angle_l);
+
+		tf_wheel_fr.setOrigin(tf::Vector3(y_fr, y_fr, 0));
+		tf_wheel_fr.setRotation(q);
+
+		tf_wheel_fl.setOrigin(tf::Vector3(x_fl, x_fl, 0));
+		tf_wheel_fl.setRotation(q);
 
 		this->br.sendTransform(tf::StampedTransform(tf_car, ros::Time::now(), "world", "car"));
 		this->br.sendTransform(tf::StampedTransform(tf_wheel_fl, ros::Time::now(), "car", "wheel_FL"));
@@ -216,7 +264,7 @@ class Odometry {
 		odom.pose.pose.position.y = get_y();
 		odom.pose.pose.position.z = 0.0;
 		geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(get_theta());
-		
+
 		odom.pose.pose.orientation= odom_quat;
 		pub = nh.advertise<nav_msgs::Odometry>("/odometry", 100);
 		pub.publish(odom);
@@ -252,7 +300,7 @@ class Odometry {
 int main(int argc, char **argv) {
 	ros::init(argc, argv, "project_1");
 	Odometry odom;
-    
+
   ros::NodeHandle nh;
 
   message_filters::Subscriber<project_1::floatStamped> sub1(nh, "/speedL_stamped", 100);
