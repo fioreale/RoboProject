@@ -6,7 +6,7 @@
 #include "message_filters/sync_policies/approximate_time.h"
 
 class Odometry {
-	
+
 	public:
   	Odometry() {
 		message_filters::Subscriber<custom_messages::floatStamped> sub1(nh, "/speedL_stamped", 100);
@@ -23,10 +23,10 @@ class Odometry {
 		f = boost::bind(&Odometry::param_callback, _1, _2);
 		server.setCallback(f);
 	}
-	
+
 	void callback(const custom_messages::floatStamped::ConstPtr& speed_L, const custom_messages::floatStamped::ConstPtr& speed_R, const custom_messages::floatStamped::ConstPtr& steer) {
 		// retrive odometry type parameter
-		// do the math ...	
+		// do the math ...
 		tf::Transform tf_car, tf_wheel_fl, tf_wheel_fr, tf_wheel_bl, tf_wheel_br;
 		transform.setOrigin(tf::Vector3(msg->x, msg->y, 0));
 		tf::Quaternion q;
@@ -39,18 +39,18 @@ class Odometry {
 		// ackermann only
 		br.sendTransform(tf::StampedTransform(tf_wheel_bl, ros::Time::now(), "car", "wheel_BL"));
 		br.sendTransform(tf::StampedTransform(tf_wheel_br, ros::Time::now(), "car", "wheel_BR"));
-		
+
 		// publish odometry
 		pub = nh.advertise<custom_messages::floatStamped>("/odometry", 100);
 		pub.publish(msg);
 	}
-	
+
 	void param_callback(parameter_test::parametersConfig &config, uint32_t level) {
 		//change either odom type or xy-position odometry
 	}
 
 	private:
-	ros::NodeHandle nh; 
+	ros::NodeHandle nh;
 	tf::TransformBroadcaster br;
 	ros::Subscriber sub;
 	ros::Publisher pub;
@@ -61,9 +61,8 @@ class Odometry {
 
 int main(int argc, char **argv) {
 	ros::init(argc, argv, "project_1");
-	Odometry odom;	
+	Odometry odom;
 
 	ros::spin();
 	return 0;
 }
-

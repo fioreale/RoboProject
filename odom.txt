@@ -1,0 +1,23 @@
+// odom: (x, y, theta)
+v = (vl + vr) / 2
+
+// differential drive odometry
+d_x = v * d_t * cos(theta)
+d_y = v * d_t * sin(theta)
+omega = (vr - vl) / b
+d_theta = omega * d_t
+
+// ackerman steering odometry (bycicle approx)
+r = d / tan(steering_angle)
+v = (vl + vr) / 2
+omega = (v * sin(steering_angle)) / d
+d_theta = omega * d_t
+d_x = r * (1 - cos(d_theta)) * cos(theta)
+d_y = r * sin(d_theta) * sin(theta)
+// front wheels odometry (turning RIGHT)
+d_steerL = atan(d / r + b)
+d_steerR = atan(d / r - b)
+// front wheels odometry (turning LEFT)
+d_steerL = atan(d / r - b)
+d_steerR = atan(d / r + b)
+
