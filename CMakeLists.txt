@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 
 project(project_1)
+add_compile_options(-std=c++11)
 
 find_package(catkin REQUIRED COMPONENTS
 	roscpp
@@ -8,6 +9,8 @@ find_package(catkin REQUIRED COMPONENTS
 	std_msgs
 	message_generation
 	message_filters
+	dynamic_reconfigure
+	tf
 )
 
 add_message_files(
@@ -19,11 +22,6 @@ generate_messages(
 	DEPENDENCIES std_msgs
 )
 
-catkin_package(CATKIN_DEPENDS
-	message_filters
-	message_runtime
-	std_msgs
-)
 
 include_directories(
   include ${catkin_INCLUDE_DIRS}
@@ -34,7 +32,7 @@ add_executable(odometry
 )
 
 add_dependencies(
-	odometry ${${PROJECT_NAME}_EXPORTED_TARGETS}
+	odometry ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS}
 )
 
 add_dependencies(
@@ -48,4 +46,12 @@ target_link_libraries(
 
 generate_dynamic_reconfigure_options(
   cfg/parameters.cfg
+)
+
+add_dependencies(odometry ${PROJECT_NAME}_gencfg)
+
+catkin_package(CATKIN_DEPENDS
+	message_filters
+	message_runtime
+	std_msgs
 )

@@ -34,7 +34,13 @@ class Odometry {
 
 	public:
   	Odometry() {
-		/*message_filters::Subscriber<project_1::floatStamped> sub1(nh, "/speedL_stamped", 100);
+
+		set_last_time(ros::Time::now());
+		set_x(0);
+		set_y(0);
+		set_theta(0);
+		set_type(0);
+	/*	message_filters::Subscriber<project_1::floatStamped> sub1(nh, "/speedL_stamped", 100);
 		message_filters::Subscriber<project_1::floatStamped> sub2(nh, "/speedR_stamped", 100);
 		message_filters::Subscriber<project_1::floatStamped> sub3(nh, "/steer_stamped", 100);
 
@@ -90,6 +96,8 @@ class Odometry {
 		return odom_type;
 	}
 
+	
+
 	void diff_drive(double vl, double vr, double delta_t) {
 		//computation of the Differential Drive odometry
 		double old_x = get_x();
@@ -101,7 +109,7 @@ class Odometry {
 
 		double new_x;
 		double new_y;
-		double new_theta = odom_theta + omega*delta_t;
+		double new_theta = fmod(old_theta + omega*delta_t,2*M_PI);
 
 		if(omega != 0) {
 			new_x = odom_x + (avg_v/omega)*(cos(new_theta) - cos(odom_theta));
@@ -150,7 +158,7 @@ class Odometry {
 
 		double new_x = old_x + d_x;
 		double new_y = old_y + d_y;
-		double new_theta = old_theta + d_theta;
+		double new_theta = fmod(old_theta + d_theta,2*M_PI);
 
 		set_x(new_x);
 		set_y(new_y);
@@ -161,7 +169,12 @@ class Odometry {
 		tf_car.setOrigin(tf::Vector3(new_x, new_y, 0));
 		tf::Quaternion q;
 		q.setRPY(0, 0, new_theta);
+		//q= q.normalized();
 		tf_car.setRotation(q);
+		tf_wheel_fl.setRotation(q);
+		tf_wheel_fr.setRotation(q);
+		tf_wheel_bl.setRotation(q);
+		tf_wheel_br.setRotation(q);
 
 		this->br.sendTransform(tf::StampedTransform(tf_car, ros::Time::now(), "world", "car"));
 		this->br.sendTransform(tf::StampedTransform(tf_wheel_fl, ros::Time::now(), "car", "wheel_FL"));
@@ -202,14 +215,17 @@ class Odometry {
 		odom.pose.pose.position.x = get_x();
 		odom.pose.pose.position.y = get_y();
 		odom.pose.pose.position.z = 0.0;
-		tf::Quaternion odom_quat;
-		odom_quat.setRPY(0, 0, get_theta());
-		odom.pose.pose.orientation = odom_quat;
-
+		geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(get_theta());
+		
+		odom.pose.pose.orientation= odom_quat;
 		pub = nh.advertise<nav_msgs::Odometry>("/odometry", 100);
 		pub.publish(odom);
 
-		//ROS_INFO("Received the message [v(l) - v(r) - steer]: [%f - %f - %f]", speed_L->data,speed_R->data,steer->data)
+	//	ROS_INFO("Received the message [v(l) - v(r) - steer]: [%f - %f - %f]", speed_L->data,speed_R->data,steer->data);
+
+		ROS_INFO("Computed pose (type: %d) [x - y - theta]: [%f - %f - %f]",get_type(), get_x(),get_y(),get_theta()*180/M_PI);
+
+
 
 		//set the last useful time
 		set_last_time(current_time);
@@ -227,7 +243,7 @@ class Odometry {
 			set_x(config.position_x);
 			set_y(config.position_y);
 		}
-		//ROS_INFO("Reconfigure Request: %d %f %f", config.int_param, config.float_param, config.float_param);
+		ROS_INFO("Reconfigure Request: %d %f %f %d", config.odom_type, config.position_x, config.position_y, level);
 	}
 
 };
@@ -247,10 +263,10 @@ int main(int argc, char **argv) {
 
   //creation of Synchronizer and relative callback binding
   message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), sub1, sub2, sub3);
-  sync.registerCallback(boost::bind(&Odometry::callback, this, _1, _2, _3));
+  sync.registerCallback(boost::bind(&Odometry::callback,odom, _1, _2, _3));
   dynamic_reconfigure::Server<project_1::parametersConfig> server;
   dynamic_reconfigure::Server<project_1::parametersConfig>::CallbackType f;
-  f = boost::bind(&Odometry::param_callback, this, _1, _2);
+  f = boost::bind(&Odometry::param_callback,odom, _1, _2);
   server.setCallback(f);
 
 	ros::spin();
