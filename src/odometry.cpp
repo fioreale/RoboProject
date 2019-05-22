@@ -1,11 +1,14 @@
 #include "ros/ros.h"
 #include "tf/transform_broadcaster.h"
-#include "custom_messages/floatStamped.h"
+#include "dynamic_reconfigure/server.h"
+#include "project_1/floatStamped.h"
 #include "message_filters/subscriber.h"
 #include "message_filters/time_synchronizer.h"
 #include "message_filters/sync_policies/approximate_time.h"
+#include "nav_msgs/Odometry.h"
 #include "project_1/parametersConfig.h"
 
+#define _USE_MATH_DEFINES
 #include <math.h>
 
 class Odometry {
@@ -31,40 +34,40 @@ class Odometry {
 
 	public:
   	Odometry() {
-		message_filters::Subscriber<custom_messages::floatStamped> sub1(nh, "/speedL_stamped", 100);
-		message_filters::Subscriber<custom_messages::floatStamped> sub2(nh, "/speedR_stamped", 100);
-		message_filters::Subscriber<custom_messages::floatStamped> sub3(nh, "/steer_stamped", 100);
+		/*message_filters::Subscriber<project_1::floatStamped> sub1(nh, "/speedL_stamped", 100);
+		message_filters::Subscriber<project_1::floatStamped> sub2(nh, "/speedR_stamped", 100);
+		message_filters::Subscriber<project_1::floatStamped> sub3(nh, "/steer_stamped", 100);
 
-		typedef message_filters::sync_policies::ApproximateTime<custom_messages::floatStamped, custom_messages::floatStamped, custom_messages::floatStamped> MySyncPolicy;
+		typedef message_filters::sync_policies::ApproximateTime<project_1::floatStamped, project_1::floatStamped, project_1::floatStamped> MySyncPolicy;
 
 		//creation of Synchronizer and relative callback binding
 		message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), sub1, sub2, sub3);
 		sync.registerCallback(boost::bind(&Odometry::callback, _1, _2, _3));
 
-		dynamic_reconfigure::Server<parameter_test::parametersConfig> server;
-		dynamic_reconfigure::Server<parameter_test::parametersConfig>::CallbackType f;
+		dynamic_reconfigure::Server<project_1::parametersConfig> server;
+		dynamic_reconfigure::Server<project_1::parametersConfig>::CallbackType f;
 		f = boost::bind(&Odometry::param_callback, _1, _2);
-		server.setCallback(f);
+		server.setCallback(f);*/
 	}
 
 	void set_x(double x){
-		this.odom_x = x;
+		this->odom_x = x;
 	}
 
 	void set_y(double y){
-		this.odom_y = y;
+		this->odom_y = y;
 	}
 
 	void set_theta(double theta){
-		this.odom_theta = theta;
+		this->odom_theta = theta;
 	}
 
 	void set_last_time(ros::Time time){
-		this.last_time = time;
+		this->last_time = time;
 	}
 
 	void set_type(double type){
-		this.odom_type = type;
+		this->odom_type = type;
 	}
 
 	double get_x(){
@@ -98,20 +101,20 @@ class Odometry {
 
 		double new_x;
 		double new_y;
-		double theta_rad = odom_theta + omega*delta_t;
+		double new_theta = odom_theta + omega*delta_t;
 
 		if(omega != 0) {
-			new_x = odom_x + (avg_v/omega)*(cos(theta_rad) - cos(odom_theta));
-			new_y = odom_y + (avg_v/omega)*(sin(theta_rad) - sin(odom_theta));
+			new_x = odom_x + (avg_v/omega)*(cos(new_theta) - cos(odom_theta));
+			new_y = odom_y + (avg_v/omega)*(sin(new_theta) - sin(odom_theta));
 		}
 		else {
-			new_x = odom_x + avg_v * delta_t * cos(theta_rad);
-			new_y = odom_y + avg_v * delta_t * sin(theta_rad);
+			new_x = odom_x + avg_v * delta_t * cos(new_theta);
+			new_y = odom_y + avg_v * delta_t * sin(new_theta);
 		}
 
 		set_x(new_x);
 		set_y(new_y);
-		set_theta(theta_rad);
+		set_theta(new_theta);
 
 		tf::Transform tf_car, tf_wheel_fl, tf_wheel_fr;
 
@@ -126,13 +129,13 @@ class Odometry {
 		tf_wheel_fr.setOrigin(tf::Vector3(new_x + 1.3/2*cos(new_theta), new_y + 1.3/2*sin(new_theta), 0));
 		tf_wheel_fr.setRotation(q);
 
-		this.br.sendTransform(tf::StampedTransform(tf_car, ros::Time::now(), "world", "car"));
-		this.br.sendTransform(tf::StampedTransform(tf_wheel_fl, ros::Time::now(), "car", "wheel_FL"));
-		this.br.sendTransform(tf::StampedTransform(tf_wheel_fr, ros::Time::now(), "car", "wheel_FR"));
+		this->br.sendTransform(tf::StampedTransform(tf_car, ros::Time::now(), "world", "car"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_fl, ros::Time::now(), "car", "wheel_FL"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_fr, ros::Time::now(), "car", "wheel_FR"));
 	}
 
 	void ackerman(double vl, double vr, double steering_angle, double delta_t) {
-		steering_angle *= PI / (180 * 18);
+		steering_angle *= M_PI / (180 * 18);
 
 		double old_x = get_x();
 		double old_y = get_y();
@@ -151,41 +154,41 @@ class Odometry {
 
 		set_x(new_x);
 		set_y(new_y);
-		set_theta(theta_rad);
+		set_theta(new_theta);
 
 		tf::Transform tf_car, tf_wheel_fl, tf_wheel_fr, tf_wheel_bl, tf_wheel_br;
 		//in the forward part the 'transform' string has to be adjusted for every tf component(car, wheels...)
-		transform.setOrigin(tf::Vector3(new_x, new_y, 0));
+		tf_car.setOrigin(tf::Vector3(new_x, new_y, 0));
 		tf::Quaternion q;
 		q.setRPY(0, 0, new_theta);
-		transform.setRotation(q);
+		tf_car.setRotation(q);
 
-		this.br.sendTransform(tf::StampedTransform(tf_car, ros::Time::now(), "world", "car"));
-		this.br.sendTransform(tf::StampedTransform(tf_wheel_fl, ros::Time::now(), "car", "wheel_FL"));
-		this.br.sendTransform(tf::StampedTransform(tf_wheel_fr, ros::Time::now(), "car", "wheel_FR"));
+		this->br.sendTransform(tf::StampedTransform(tf_car, ros::Time::now(), "world", "car"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_fl, ros::Time::now(), "car", "wheel_FL"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_fr, ros::Time::now(), "car", "wheel_FR"));
 		// ackermann only
-		this.br.sendTransform(tf::StampedTransform(tf_wheel_bl, ros::Time::now(), "car", "wheel_BL"));
-		this.br.sendTransform(tf::StampedTransform(tf_wheel_br, ros::Time::now(), "car", "wheel_BR"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_bl, ros::Time::now(), "car", "wheel_BL"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_br, ros::Time::now(), "car", "wheel_BR"));
 	}
 
 	// odometry callback
-	void callback(const custom_messages::floatStamped::ConstPtr& speed_L, const custom_messages::floatStamped::ConstPtr& speed_R, const custom_messages::floatStamped::ConstPtr& steer) {
+	void callback(const project_1::floatStamped::ConstPtr& speed_L, const project_1::floatStamped::ConstPtr& speed_R, const project_1::floatStamped::ConstPtr& steer) {
 		// retrive odometry type parameter
 		// do the math ...
 
 		ros::Time current_time = ros::Time::now();
-		ros::Time diff_time = current - this.get_last_time();
+		ros::Duration diff_time = current_time - this->get_last_time();
 
 		switch (get_type()) {
 			case 0: {
 				//Diff_drive
-				diff_drive(speed_L->data, speed_R->data, diff_time);
+				diff_drive(speed_L->data, speed_R->data, diff_time.toSec());
 				//ROS_INFO("updating the position [x - y - theta]: [%f - %f - %f]", odom_x,odom_y,odom_theta);
 				break;
 			}
 			case 1: {
 				//Ackerman
-				ackerman(speed_L->data, speed_R->data, steer->data, diff_time);
+				ackerman(speed_L->data, speed_R->data, steer->data, diff_time.toSec());
 				break;
 			}
 		}
@@ -213,13 +216,13 @@ class Odometry {
 	}
 
 	//dynamic configuration
-	void param_callback(parameter_test::parametersConfig &config, uint32_t level) {
+	void param_callback(project_1::parametersConfig &config, uint32_t level) {
 		//change either odom type or xy-position odometry
 		if(level == 0) {
 			// change odom type
 			set_type(config.odom_type);
 		}
-		else (level == 1) {
+		else if (level == 1) {
 			// change xy-position
 			set_x(config.position_x);
 			set_y(config.position_y);
@@ -233,6 +236,22 @@ class Odometry {
 int main(int argc, char **argv) {
 	ros::init(argc, argv, "project_1");
 	Odometry odom;
+    
+  ros::NodeHandle nh;
+
+  message_filters::Subscriber<project_1::floatStamped> sub1(nh, "/speedL_stamped", 100);
+  message_filters::Subscriber<project_1::floatStamped> sub2(nh, "/speedR_stamped", 100);
+  message_filters::Subscriber<project_1::floatStamped> sub3(nh, "/steer_stamped", 100);
+
+  typedef message_filters::sync_policies::ApproximateTime<project_1::floatStamped, project_1::floatStamped, project_1::floatStamped> MySyncPolicy;
+
+  //creation of Synchronizer and relative callback binding
+  message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), sub1, sub2, sub3);
+  sync.registerCallback(boost::bind(&Odometry::callback, this, _1, _2, _3));
+  dynamic_reconfigure::Server<project_1::parametersConfig> server;
+  dynamic_reconfigure::Server<project_1::parametersConfig>::CallbackType f;
+  f = boost::bind(&Odometry::param_callback, this, _1, _2);
+  server.setCallback(f);
 
 	ros::spin();
 	return 0;
