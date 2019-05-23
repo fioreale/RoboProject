@@ -128,10 +128,17 @@ class Odometry {
 		q.setRPY(0, 0, new_theta);
 		tf_car.setRotation(q);
 
+<<<<<<< HEAD
 		tf_wheel_fl.setOrigin(tf::Vector3(new_x - BASE_L/2*cos(new_theta), new_y - BASE_L/2*sin(new_theta), 0));
 		tf_wheel_fl.setRotation(q);
 
 		tf_wheel_fr.setOrigin(tf::Vector3(new_x + BASE_L/2*cos(new_theta), new_y + BASE_L/2*sin(new_theta), 0));
+=======
+		tf_wheel_fl.setOrigin(tf::Vector3(new_x - BASE_L/2*cos(new_theta), new_y - DISTANCE/2*sin(new_theta), 0));
+		tf_wheel_fl.setRotation(q);
+
+		tf_wheel_fr.setOrigin(tf::Vector3(new_x + BASE_L/2*cos(new_theta), new_y + DISTANCE/2*sin(new_theta), 0));
+>>>>>>> 8d25ba815028a3c34a2188ff65d93f57d4cbfc02
 		tf_wheel_fr.setRotation(q);
 
 		ros::Time tf_time = ros::Time::now();
