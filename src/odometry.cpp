@@ -101,12 +101,12 @@ class Odometry {
 		double old_y = get_y();
 		double old_theta = get_theta();
 
-		double avg_v = (vl + vr)/2;
-		double omega = (vr - vl)/BASE_L;
+		double avg_v = (vl + vr) / 2;
+		double omega = (vr - vl) / BASE_L;
 
 		double new_x;
 		double new_y;
-		double new_theta = fmod(old_theta + omega*delta_t,2*M_PI);
+		double new_theta = fmod(old_theta + omega*delta_t, 2*M_PI);
 
 		if(omega != 0) {
 			new_x = odom_x + (avg_v/omega)*(cos(new_theta) - cos(odom_theta));
@@ -128,10 +128,10 @@ class Odometry {
 		q.setRPY(0, 0, new_theta);
 		tf_car.setRotation(q);
 
-		tf_wheel_fl.setOrigin(tf::Vector3(new_x - DISTANCE/2*cos(new_theta), new_y - DISTANCE/2*sin(new_theta), 0));
+		tf_wheel_fl.setOrigin(tf::Vector3(new_x - BASE_L/2*cos(new_theta), new_y - BASE_L/2*sin(new_theta), 0));
 		tf_wheel_fl.setRotation(q);
 
-		tf_wheel_fr.setOrigin(tf::Vector3(new_x + DISTANCE/2*cos(new_theta), new_y + DISTANCE/2*sin(new_theta), 0));
+		tf_wheel_fr.setOrigin(tf::Vector3(new_x + BASE_L/2*cos(new_theta), new_y + BASE_L/2*sin(new_theta), 0));
 		tf_wheel_fr.setRotation(q);
 
 		ros::Time tf_time = ros::Time::now();
@@ -143,37 +143,84 @@ class Odometry {
 
 	void ackerman(double vl, double vr, double steering_angle, double delta_t) {
 		steering_angle *= M_PI / (180 * STEER_FACT);
+		double steering_angle_l;
+		double steering_angle_r;
 
 		double old_x = get_x();
 		double old_y = get_y();
 		double old_theta = get_theta();
 
-		double r = BASE_L / tan(steering_angle);
+		double r = DISTANCE / tan(steering_angle);
 		double avg_v = (vl + vr) / 2;
-		double omega = (avg_v * sin(steering_angle)) / BASE_L;
+		double omega = (avg_v * sin(steering_angle)) / DISTANCE;
 		double d_theta = omega * delta_t;
 		double d_x = r * (1 - cos(d_theta)) * cos(old_theta);
 		double d_y = r * sin(d_theta) * sin(old_theta);
 
 		double new_x = old_x + d_x;
 		double new_y = old_y + d_y;
-		double new_theta = fmod(old_theta + d_theta,2*M_PI);
+		double new_theta = fmod(old_theta + d_theta, 2*M_PI);
+
+		double x_fr, y_fr, x_br, y_br;
+		double x_fl, y_fl, x_bl, y_bl;
+
+		double axis_x, axis_y;
 
 		set_x(new_x);
 		set_y(new_y);
 		set_theta(new_theta);
 
 		tf::Transform tf_car, tf_wheel_fl, tf_wheel_fr, tf_wheel_bl, tf_wheel_br;
-
+		//in the forward part the 'transform' string has to be adjusted for every tf component(car, wheels...)
 		tf_car.setOrigin(tf::Vector3(new_x, new_y, 0));
 		tf::Quaternion q;
 		q.setRPY(0, 0, new_theta);
-
+		//q= q.normalized();
 		tf_car.setRotation(q);
 		tf_wheel_fl.setRotation(q);
 		tf_wheel_fr.setRotation(q);
+
+		x_bl = new_x - BASE_L/2*cos(new_theta);
+		y_bl = new_y - BASE_L/2*sin(new_theta);
+
+		tf_wheel_bl.setOrigin(tf::Vector3(x_bl, y_bl, 0));
 		tf_wheel_bl.setRotation(q);
+
+		x_br = new_x + BASE_L/2*cos(new_theta);
+		y_br = new_y + BASE_L/2*sin(new_theta);
+
+		tf_wheel_br.setOrigin(tf::Vector3(x_br, y_br, 0));
 		tf_wheel_br.setRotation(q);
+
+		axis_x = DISTANCE*cos(new_theta);
+		axis_y = DISTANCE*sin(new_theta);
+
+		x_fr = x_br + axis_x;
+		y_fr = y_br + axis_y;
+
+		x_fl = x_bl + axis_x;
+		y_fl = y_bl + axis_y;
+
+		tf::Quaternion q_fr;
+		tf::Quaternion q_fl;
+
+		if(steering_angle > 0){
+			steering_angle_l = atan(DISTANCE / (r + BASE_L));
+			steering_angle_r = atan(DISTANCE / (r - BASE_L));
+		}
+		else {
+			steering_angle_l = atan(DISTANCE / (r - BASE_L));
+			steering_angle_r = atan(DISTANCE / (r + BASE_L));
+		}
+
+		q_fr.setRPY(0, 0, new_theta - steering_angle_r);
+		q_fl.setRPY(0, 0, new_theta - steering_angle_l);
+
+		tf_wheel_fr.setOrigin(tf::Vector3(y_fr, y_fr, 0));
+		tf_wheel_fr.setRotation(q);
+
+		tf_wheel_fl.setOrigin(tf::Vector3(x_fl, x_fl, 0));
+		tf_wheel_fl.setRotation(q);
 
 		ros::Time tf_time = ros::Time::now();
 
