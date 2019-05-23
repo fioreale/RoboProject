@@ -11,6 +11,10 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+#define BASE_L 1.765
+#define DISTANCE 1.3
+#define STEER_FACT 18
+
 class Odometry {
 
 	private:
@@ -20,17 +24,12 @@ class Odometry {
 		ros::Publisher pub;
 
 		int odom_type;
-		double base_L = 1.3;
-		double d = 1.765;
-		int steer_fact = 18;
 
 		double odom_x;
 		double odom_y;
 		double odom_theta;
 
 		ros::Time last_time;
-		// current odometry
-		// odom type
 
 	public:
   	Odometry() {
@@ -96,8 +95,6 @@ class Odometry {
 		return odom_type;
 	}
 
-
-
 	void diff_drive(double vl, double vr, double delta_t) {
 		//computation of the Differential Drive odometry
 		double old_x = get_x();
@@ -105,7 +102,7 @@ class Odometry {
 		double old_theta = get_theta();
 
 		double avg_v = (vl + vr)/2;
-		double omega = (vr - vl)/base_L;
+		double omega = (vr - vl)/BASE_L;
 
 		double new_x;
 		double new_y;
@@ -131,29 +128,29 @@ class Odometry {
 		q.setRPY(0, 0, new_theta);
 		tf_car.setRotation(q);
 
-		tf_wheel_fl.setOrigin(tf::Vector3(new_x - 1.3/2*cos(new_theta), new_y - 1.3/2*sin(new_theta), 0));
+		tf_wheel_fl.setOrigin(tf::Vector3(new_x - DISTANCE/2*cos(new_theta), new_y - DISTANCE/2*sin(new_theta), 0));
 		tf_wheel_fl.setRotation(q);
 
-		tf_wheel_fr.setOrigin(tf::Vector3(new_x + 1.3/2*cos(new_theta), new_y + 1.3/2*sin(new_theta), 0));
+		tf_wheel_fr.setOrigin(tf::Vector3(new_x + DISTANCE/2*cos(new_theta), new_y + DISTANCE/2*sin(new_theta), 0));
 		tf_wheel_fr.setRotation(q);
 
-		this->br.sendTransform(tf::StampedTransform(tf_car, ros::Time::now(), "world", "car"));
-		this->br.sendTransform(tf::StampedTransform(tf_wheel_fl, ros::Time::now(), "car", "wheel_FL"));
-		this->br.sendTransform(tf::StampedTransform(tf_wheel_fr, ros::Time::now(), "car", "wheel_FR"));
+		ros::Time tf_time = ros::Time::now();
+
+		this->br.sendTransform(tf::StampedTransform(tf_car, tf_time, "world", "car"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_fl, tf_time, "car", "wheel_FL"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_fr, tf_time, "car", "wheel_FR"));
 	}
 
 	void ackerman(double vl, double vr, double steering_angle, double delta_t) {
-		steering_angle *= M_PI / (180 * 18);
-		double steering_angle_l;
-		double steering_angle_r;
+		steering_angle *= M_PI / (180 * STEER_FACT);
 
 		double old_x = get_x();
 		double old_y = get_y();
 		double old_theta = get_theta();
 
-		double r = 1.765 / tan(steering_angle);
+		double r = BASE_L / tan(steering_angle);
 		double avg_v = (vl + vr) / 2;
-		double omega = (avg_v * sin(steering_angle)) / 1.765;
+		double omega = (avg_v * sin(steering_angle)) / BASE_L;
 		double d_theta = omega * delta_t;
 		double d_x = r * (1 - cos(d_theta)) * cos(old_theta);
 		double d_y = r * sin(d_theta) * sin(old_theta);
@@ -162,74 +159,29 @@ class Odometry {
 		double new_y = old_y + d_y;
 		double new_theta = fmod(old_theta + d_theta,2*M_PI);
 
-		double x_fr, y_fr, x_br, y_br;
-
-		double x_fl, y_fl, x_bl, y_bl;
-
-		double axis_x, axis_y;
-
 		set_x(new_x);
 		set_y(new_y);
 		set_theta(new_theta);
 
 		tf::Transform tf_car, tf_wheel_fl, tf_wheel_fr, tf_wheel_bl, tf_wheel_br;
-		//in the forward part the 'transform' string has to be adjusted for every tf component(car, wheels...)
+
 		tf_car.setOrigin(tf::Vector3(new_x, new_y, 0));
 		tf::Quaternion q;
 		q.setRPY(0, 0, new_theta);
-		//q= q.normalized();
+
 		tf_car.setRotation(q);
 		tf_wheel_fl.setRotation(q);
 		tf_wheel_fr.setRotation(q);
-
-		x_bl = new_x - 1.3/2*cos(new_theta);
-		y_bl = new_y - 1.3/2*sin(new_theta);
-
-		tf_wheel_bl.setOrigin(tf::Vector3(x_bl, y_bl, 0));
 		tf_wheel_bl.setRotation(q);
-
-		x_br = new_x + 1.3/2*cos(new_theta);
-		y_br = new_y + 1.3/2*sin(new_theta);
-
-		tf_wheel_br.setOrigin(tf::Vector3(x_br, y_br, 0));
 		tf_wheel_br.setRotation(q);
 
-		axis_x = d*cos(new_theta);
-		axis_y = d*sin(new_theta);
+		ros::Time tf_time = ros::Time::now();
 
-		x_fr = x_br + axis_x;
-		y_fr = y_br + axis_y;
-
-		x_fl = x_bl + axis_x;
-		y_fl = y_bl + axis_y;
-
-		tf::Quaternion q_fr;
-		tf::Quaternion q_fl;
-
-		if(steering_angle>0){
-			steering_angle_l = atan(d/(R + b));
-			steering_angle_r = atan(d/(R - b));
-		}
-		else{
-			steering_angle_l = atan(d/(R - b));
-			steering_angle_r = atan(d/(R + b));
-		}
-		
-		q_fr.setRPY(0, 0, new_theta - steering_angle_r);
-		q_fl.setRPY(0, 0, new_theta - steering_angle_l);
-
-		tf_wheel_fr.setOrigin(tf::Vector3(y_fr, y_fr, 0));
-		tf_wheel_fr.setRotation(q);
-
-		tf_wheel_fl.setOrigin(tf::Vector3(x_fl, x_fl, 0));
-		tf_wheel_fl.setRotation(q);
-
-		this->br.sendTransform(tf::StampedTransform(tf_car, ros::Time::now(), "world", "car"));
-		this->br.sendTransform(tf::StampedTransform(tf_wheel_fl, ros::Time::now(), "car", "wheel_FL"));
-		this->br.sendTransform(tf::StampedTransform(tf_wheel_fr, ros::Time::now(), "car", "wheel_FR"));
-		// ackermann only
-		this->br.sendTransform(tf::StampedTransform(tf_wheel_bl, ros::Time::now(), "car", "wheel_BL"));
-		this->br.sendTransform(tf::StampedTransform(tf_wheel_br, ros::Time::now(), "car", "wheel_BR"));
+		this->br.sendTransform(tf::StampedTransform(tf_car, tf_time, "world", "car"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_fl, tf_time, "car", "wheel_FL"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_fr, tf_time, "car", "wheel_FR"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_bl, tf_time, "car", "wheel_BL"));
+		this->br.sendTransform(tf::StampedTransform(tf_wheel_br, tf_time, "car", "wheel_BR"));
 	}
 
 	// odometry callback
@@ -244,7 +196,6 @@ class Odometry {
 			case 0: {
 				//Diff_drive
 				diff_drive(speed_L->data, speed_R->data, diff_time.toSec());
-				//ROS_INFO("updating the position [x - y - theta]: [%f - %f - %f]", odom_x,odom_y,odom_theta);
 				break;
 			}
 			case 1: {
@@ -266,14 +217,12 @@ class Odometry {
 		geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(get_theta());
 
 		odom.pose.pose.orientation= odom_quat;
-		pub = nh.advertise<nav_msgs::Odometry>("/odometry", 100);
+		pub = nh.advertise<nav_msgs::Odometry>("/odom_topic", 100);
 		pub.publish(odom);
 
 	//	ROS_INFO("Received the message [v(l) - v(r) - steer]: [%f - %f - %f]", speed_L->data,speed_R->data,steer->data);
 
-		ROS_INFO("Computed pose (type: %d) [x - y - theta]: [%f - %f - %f]",get_type(), get_x(),get_y(),get_theta()*180/M_PI);
-
-
+		ROS_INFO("Computed pose (type: %d) [x - y - theta]: [%f - %f - %f]",get_type(),get_x(),get_y(),get_theta()*180/M_PI);
 
 		//set the last useful time
 		set_last_time(current_time);
@@ -286,7 +235,7 @@ class Odometry {
 			// change odom type
 			set_type(config.odom_type);
 		}
-		else if (level == 1) {
+		else if(level == 1) {
 			// change xy-position
 			set_x(config.position_x);
 			set_y(config.position_y);
@@ -311,10 +260,10 @@ int main(int argc, char **argv) {
 
   //creation of Synchronizer and relative callback binding
   message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), sub1, sub2, sub3);
-  sync.registerCallback(boost::bind(&Odometry::callback,odom, _1, _2, _3));
+  sync.registerCallback(boost::bind(&Odometry::callback,&odom, _1, _2, _3));
   dynamic_reconfigure::Server<project_1::parametersConfig> server;
   dynamic_reconfigure::Server<project_1::parametersConfig>::CallbackType f;
-  f = boost::bind(&Odometry::param_callback,odom, _1, _2);
+  f = boost::bind(&Odometry::param_callback,&odom, _1, _2);
   server.setCallback(f);
 
 	ros::spin();
