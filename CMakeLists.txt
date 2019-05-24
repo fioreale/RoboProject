@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
 	roscpp
 	rospy
 	std_msgs
+	nav_msgs
 	message_generation
 	message_filters
 	dynamic_reconfigure
@@ -15,12 +16,12 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
 	FILES
 	floatStamped.msg
+	odom_cm.msg
 )
 
 generate_messages(
-	DEPENDENCIES std_msgs
+	DEPENDENCIES std_msgs nav_msgs
 )
-
 
 include_directories(
   include ${catkin_INCLUDE_DIRS}

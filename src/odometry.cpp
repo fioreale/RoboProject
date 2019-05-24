@@ -2,6 +2,7 @@
 #include "tf/transform_broadcaster.h"
 #include "dynamic_reconfigure/server.h"
 #include "project_1/floatStamped.h"
+#include "project_1/odom_cm.h"
 #include "message_filters/subscriber.h"
 #include "message_filters/time_synchronizer.h"
 #include "message_filters/sync_policies/approximate_time.h"
@@ -23,36 +24,28 @@ class Odometry {
 		ros::Subscriber sub;
 		ros::Publisher pub;
 
+		/*
+		odom_type
+		differential = 0
+		ackerman = 1
+		*/
 		int odom_type;
 
+		// computed odometry
 		double odom_x;
 		double odom_y;
 		double odom_theta;
 
+		// last timestamp measured
 		ros::Time last_time;
 
 	public:
   	Odometry() {
-
 		set_last_time(ros::Time::now());
 		set_x(0);
 		set_y(0);
 		set_theta(0);
 		set_type(0);
-	/*	message_filters::Subscriber<project_1::floatStamped> sub1(nh, "/speedL_stamped", 100);
-		message_filters::Subscriber<project_1::floatStamped> sub2(nh, "/speedR_stamped", 100);
-		message_filters::Subscriber<project_1::floatStamped> sub3(nh, "/steer_stamped", 100);
-
-		typedef message_filters::sync_policies::ApproximateTime<project_1::floatStamped, project_1::floatStamped, project_1::floatStamped> MySyncPolicy;
-
-		//creation of Synchronizer and relative callback binding
-		message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), sub1, sub2, sub3);
-		sync.registerCallback(boost::bind(&Odometry::callback, _1, _2, _3));
-
-		dynamic_reconfigure::Server<project_1::parametersConfig> server;
-		dynamic_reconfigure::Server<project_1::parametersConfig>::CallbackType f;
-		f = boost::bind(&Odometry::param_callback, _1, _2);
-		server.setCallback(f);*/
 	}
 
 	void set_x(double x){
@@ -95,8 +88,9 @@ class Odometry {
 		return odom_type;
 	}
 
+	//computation of the differential drive steering odometry
 	void diff_drive(double vl, double vr, double delta_t) {
-		//computation of the Differential Drive odometry
+
 		double old_x = get_x();
 		double old_y = get_y();
 		double old_theta = get_theta();
@@ -104,35 +98,42 @@ class Odometry {
 		double avg_v = (vl + vr) / 2;
 		double omega = (vr - vl) / BASE_L;
 
-		double new_x;
-		double new_y;
+		double new_x, new_y;
 		double new_theta = fmod(old_theta + omega*delta_t, 2*M_PI);
 
 		if(omega != 0) {
-			new_x = odom_x + (avg_v/omega)*(cos(new_theta) - cos(odom_theta));
-			new_y = odom_y + (avg_v/omega)*(sin(new_theta) - sin(odom_theta));
+			// exact computation
+			new_x = old_x + (avg_v/omega)*(sin(new_theta) - sin(old_theta));
+			new_y = old_y - (avg_v/omega)*(cos(new_theta) - cos(old_theta));
 		}
 		else {
-			new_x = odom_x + avg_v * delta_t * cos(new_theta);
-			new_y = odom_y + avg_v * delta_t * sin(new_theta);
+			// Euler integration
+			new_x = old_x + avg_v * delta_t * cos(old_theta);
+			new_y = old_y + avg_v * delta_t * sin(old_theta);
 		}
 
+		// save the updated odometry
 		set_x(new_x);
 		set_y(new_y);
 		set_theta(new_theta);
 
+		// transformation frames of the two wheels and the car
 		tf::Transform tf_car, tf_wheel_fl, tf_wheel_fr;
 
 		tf_car.setOrigin(tf::Vector3(new_x, new_y, 0));
-		tf::Quaternion q;
+
+		tf::Quaternion q, q_id;
+
 		q.setRPY(0, 0, new_theta);
+		q_id.setRPY(0, 0, 0);
+
 		tf_car.setRotation(q);
 
-		tf_wheel_fl.setOrigin(tf::Vector3(new_x - BASE_L/2*cos(new_theta), new_y - BASE_L/2*sin(new_theta), 0));
-		tf_wheel_fl.setRotation(q);
+		tf_wheel_fl.setOrigin(tf::Vector3(0, BASE_L/2, 0));
+		tf_wheel_fl.setRotation(q_id);
 
-		tf_wheel_fr.setOrigin(tf::Vector3(new_x + BASE_L/2*cos(new_theta), new_y + BASE_L/2*sin(new_theta), 0));
-		tf_wheel_fr.setRotation(q);
+		tf_wheel_fr.setOrigin(tf::Vector3(0, -BASE_L/2, 0));
+		tf_wheel_fr.setRotation(q_id);
 
 		ros::Time tf_time = ros::Time::now();
 
@@ -141,7 +142,9 @@ class Odometry {
 		this->br.sendTransform(tf::StampedTransform(tf_wheel_fr, tf_time, "car", "wheel_FR"));
 	}
 
+	//computation of the ackerman steering odometry
 	void ackerman(double vl, double vr, double steering_angle, double delta_t) {
+
 		steering_angle *= M_PI / (180 * STEER_FACT);
 		double steering_angle_l;
 		double steering_angle_r;
@@ -154,8 +157,11 @@ class Odometry {
 		double avg_v = (vl + vr) / 2;
 		double omega = (avg_v * sin(steering_angle)) / DISTANCE;
 		double d_theta = omega * delta_t;
-		double d_x = r * (1 - cos(d_theta)) * cos(old_theta);
-		double d_y = r * sin(d_theta) * sin(old_theta);
+
+		double _d_x = r * sin(d_theta);
+		double _d_y = r * (1 - cos(d_theta));
+		double d_x = _d_x*cos(old_theta) - _d_y*sin(old_theta);
+		double d_y = _d_x*sin(old_theta) + _d_y*cos(old_theta);
 
 		double new_x = old_x + d_x;
 		double new_y = old_y + d_y;
@@ -164,63 +170,63 @@ class Odometry {
 		double x_fr, y_fr, x_br, y_br;
 		double x_fl, y_fl, x_bl, y_bl;
 
-		double axis_x, axis_y;
-
+		// save the updated odometry
 		set_x(new_x);
 		set_y(new_y);
 		set_theta(new_theta);
 
+		// transformation frames of the four wheels and the car
 		tf::Transform tf_car, tf_wheel_fl, tf_wheel_fr, tf_wheel_bl, tf_wheel_br;
-		//in the forward part the 'transform' string has to be adjusted for every tf component(car, wheels...)
+
 		tf_car.setOrigin(tf::Vector3(new_x, new_y, 0));
 		tf::Quaternion q;
 		q.setRPY(0, 0, new_theta);
-		//q= q.normalized();
 		tf_car.setRotation(q);
 		tf_wheel_fl.setRotation(q);
 		tf_wheel_fr.setRotation(q);
 
-		x_bl = new_x - BASE_L/2*cos(new_theta);
-		y_bl = new_y - BASE_L/2*sin(new_theta);
+		//note: the rear wheels (back) are fixed wrt the car
+		tf::Quaternion q_fr, q_fl, q_id;
+		q_id.setRPY(0, 0, 0);
+
+		x_bl = 0;
+		y_bl = BASE_L/2;
 
 		tf_wheel_bl.setOrigin(tf::Vector3(x_bl, y_bl, 0));
-		tf_wheel_bl.setRotation(q);
+		tf_wheel_bl.setRotation(q_id);
 
-		x_br = new_x + BASE_L/2*cos(new_theta);
-		y_br = new_y + BASE_L/2*sin(new_theta);
+		x_br = 0;
+		y_br = -BASE_L/2;
 
 		tf_wheel_br.setOrigin(tf::Vector3(x_br, y_br, 0));
-		tf_wheel_br.setRotation(q);
+		tf_wheel_br.setRotation(q_id);
 
-		axis_x = DISTANCE*cos(new_theta);
-		axis_y = DISTANCE*sin(new_theta);
+		x_fr = x_br + DISTANCE;
+		y_fr = y_br;
 
-		x_fr = x_br + axis_x;
-		y_fr = y_br + axis_y;
+		x_fl = x_bl + DISTANCE;
+		y_fl = y_bl;
 
-		x_fl = x_bl + axis_x;
-		y_fl = y_bl + axis_y;
-
-		tf::Quaternion q_fr;
-		tf::Quaternion q_fl;
-
-		if(steering_angle > 0){
+		// check if the car is turning left or right
+		if(steering_angle > 0) {
+			// turning left
 			steering_angle_l = atan(DISTANCE / (r + BASE_L));
 			steering_angle_r = atan(DISTANCE / (r - BASE_L));
 		}
 		else {
+			// turning right
 			steering_angle_l = atan(DISTANCE / (r - BASE_L));
 			steering_angle_r = atan(DISTANCE / (r + BASE_L));
 		}
 
-		q_fr.setRPY(0, 0, new_theta - steering_angle_r);
-		q_fl.setRPY(0, 0, new_theta - steering_angle_l);
+		q_fr.setRPY(0, 0, steering_angle_r);
+		q_fl.setRPY(0, 0, steering_angle_l);
 
-		tf_wheel_fr.setOrigin(tf::Vector3(y_fr, y_fr, 0));
-		tf_wheel_fr.setRotation(q);
+		tf_wheel_fr.setOrigin(tf::Vector3(x_fr, y_fr, 0));
+		tf_wheel_fr.setRotation(q_fr);
 
-		tf_wheel_fl.setOrigin(tf::Vector3(x_fl, x_fl, 0));
-		tf_wheel_fl.setRotation(q);
+		tf_wheel_fl.setOrigin(tf::Vector3(x_fl, y_fl, 0));
+		tf_wheel_fl.setRotation(q_fl);
 
 		ros::Time tf_time = ros::Time::now();
 
@@ -235,13 +241,12 @@ class Odometry {
 	void callback(const project_1::floatStamped::ConstPtr& speed_L, const project_1::floatStamped::ConstPtr& speed_R, const project_1::floatStamped::ConstPtr& steer) {
 		// retrive odometry type parameter
 		// do the math ...
-
 		ros::Time current_time = ros::Time::now();
 		ros::Duration diff_time = current_time - this->get_last_time();
 
 		switch (get_type()) {
 			case 0: {
-				//Diff_drive
+				//Diff Drive
 				diff_drive(speed_L->data, speed_R->data, diff_time.toSec());
 				break;
 			}
@@ -263,11 +268,20 @@ class Odometry {
 		odom.pose.pose.position.z = 0.0;
 		geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(get_theta());
 
-		odom.pose.pose.orientation= odom_quat;
-		pub = nh.advertise<nav_msgs::Odometry>("/odom_topic", 100);
-		pub.publish(odom);
+		odom.pose.pose.orientation = odom_quat;
 
-	//	ROS_INFO("Received the message [v(l) - v(r) - steer]: [%f - %f - %f]", speed_L->data,speed_R->data,steer->data);
+		std::string odom_types[2] = {"differential", "ackerman"};
+
+		// set the custom message of the odometry
+		project_1::odom_cm odom_cm;
+		odom_cm.odom_type = odom_types[get_type()];
+		odom_cm.odom = odom;
+
+		// publish the odometry
+		pub = nh.advertise<project_1::odom_cm>("/odom_topic", 100);
+		pub.publish(odom_cm);
+
+		//ROS_INFO("Received the message [v(l) - v(r) - steer]: [%f - %f - %f]", speed_L->data,speed_R->data,steer->data);
 
 		ROS_INFO("Computed pose (type: %d) [x - y - theta]: [%f - %f - %f]",get_type(),get_x(),get_y(),get_theta()*180/M_PI);
 
@@ -297,21 +311,24 @@ int main(int argc, char **argv) {
 	ros::init(argc, argv, "project_1");
 	Odometry odom;
 
-  ros::NodeHandle nh;
+	ros::NodeHandle nh;
 
-  message_filters::Subscriber<project_1::floatStamped> sub1(nh, "/speedL_stamped", 100);
-  message_filters::Subscriber<project_1::floatStamped> sub2(nh, "/speedR_stamped", 100);
-  message_filters::Subscriber<project_1::floatStamped> sub3(nh, "/steer_stamped", 100);
+	// subscriber for odometry
+	message_filters::Subscriber<project_1::floatStamped> sub1(nh, "/speedL_stamped", 100);
+	message_filters::Subscriber<project_1::floatStamped> sub2(nh, "/speedR_stamped", 100);
+	message_filters::Subscriber<project_1::floatStamped> sub3(nh, "/steer_stamped", 100);
 
-  typedef message_filters::sync_policies::ApproximateTime<project_1::floatStamped, project_1::floatStamped, project_1::floatStamped> MySyncPolicy;
+	typedef message_filters::sync_policies::ApproximateTime<project_1::floatStamped, project_1::floatStamped, project_1::floatStamped> MySyncPolicy;
 
-  //creation of Synchronizer and relative callback binding
-  message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), sub1, sub2, sub3);
-  sync.registerCallback(boost::bind(&Odometry::callback,&odom, _1, _2, _3));
-  dynamic_reconfigure::Server<project_1::parametersConfig> server;
-  dynamic_reconfigure::Server<project_1::parametersConfig>::CallbackType f;
-  f = boost::bind(&Odometry::param_callback,&odom, _1, _2);
-  server.setCallback(f);
+	// creation of Synchronizer and relative callback binding
+	message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), sub1, sub2, sub3);
+	sync.registerCallback(boost::bind(&Odometry::callback, &odom, _1, _2, _3));
+
+	// dynamic reconfigure setting
+	dynamic_reconfigure::Server<project_1::parametersConfig> server;
+	dynamic_reconfigure::Server<project_1::parametersConfig>::CallbackType f;
+	f = boost::bind(&Odometry::param_callback, &odom, _1, _2);
+	server.setCallback(f);
 
 	ros::spin();
 	return 0;
