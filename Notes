@@ -1,6 +1,0 @@
-1) metterei i dati in ingresso in metri, dato che le velocità sono espresse in m/s ed avremmo ridondanza altrimenti.
-2) userei meno dati in callback ma definirei il necessario nella 'private' zone e poi usare questi tramite opportuni metodi getter, setter
-3)per Chiara**, ho creato un metodo apposito per la computazione così da lasciare più pulita la callback, se vuoi fai lo stesso :)
-4)SIMONE non ho capito l'advertise su /odometry serve per cosa?
-5) va inserito come dato privato il tipo di odometria ricevuta
-6) ho inserito una nota per le tf che sono da completare (Simone hai aggiunto 'transform' che riprende l'esempio delle slide ma bisogna farlo per l'elenco dei Transform che hai inserito)

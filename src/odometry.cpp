@@ -21,7 +21,6 @@ class Odometry {
 	private:
 		ros::NodeHandle nh;
 		tf::TransformBroadcaster br;
-		ros::Subscriber sub;
 		ros::Publisher pub;
 
 		/*
