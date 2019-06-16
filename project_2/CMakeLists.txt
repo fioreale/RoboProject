@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(imu_complementary_filter)
+project(project_2)
 
 find_package(catkin REQUIRED COMPONENTS
   cmake_modules
@@ -30,11 +30,26 @@ add_library(complementary_filter
 )
 
 
-add_executable(complementary_filter_node
-  src/odometry.cpp)
-target_link_libraries(complementary_filter_node complementary_filter ${catkin_LIBRARIES})
+add_executable(odometry
+  src/odometry.cpp
+)
 
-install(TARGETS complementary_filter complementary_filter_node
+add_dependencies(
+	odometry ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS}
+)
+
+add_dependencies(
+	odometry ${catkin_EXPORTED_TARGETS}
+)
+
+target_link_libraries(
+	odometry
+	${catkin_LIBRARIES}
+)
+
+target_link_libraries(odometry complementary_filter ${catkin_LIBRARIES})
+
+install(TARGETS complementary_filter odometry
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

@@ -1,7 +1,5 @@
 #include "ros/ros.h"
 #include "message_filters/subscriber.h"
-#include "message_filters/time_synchronizer.h"
-#include "message_filters/sync_policies/exact_time.h"
 #include "nav_msgs/Odometry.h"
 #include "imu_complementary_filter/complementary_filter_ros.h"
 
@@ -31,7 +29,6 @@ class Odometry {
 		set_x(0);
 		set_y(0);
 		set_theta(0);
-		set_type(0);
 	}
 
 	void set_x(double x){
@@ -50,10 +47,6 @@ class Odometry {
 		this->last_time = time;
 	}
 
-	void set_type(double type){
-		this->odom_type = type;
-	}
-
 	double get_x(){
 		return odom_x;
 	}
@@ -70,13 +63,10 @@ class Odometry {
 		return last_time;
 	}
 
-	int get_type(){
-		return odom_type;
-	}
-
 	//computation of the ackerman steering odometry
 	void ackerman(double v, double steering_angle, double delta_t) {
 
+		v /= 3.6;
 		steering_angle *= M_PI / (180 * STEER_FACT);
 
 		double old_x = get_x();
@@ -103,13 +93,12 @@ class Odometry {
 	}
 
 	// odometry callback
-	void callback(const project_1::floatStamped::ConstPtr& steer, const project_1::floatStamped::ConstPtr& speed_R) {
-		// retrive odometry type parameter
+	void callback(const geometry_msgs::PointStamped::ConstPtr& speedsteer) {
 		// do the math ...
 		ros::Time current_time = ros::Time::now();
 		ros::Duration diff_time = current_time - this->get_last_time();
 
-		ackerman(speed_L->data, speed_R->data, steer->data, diff_time.toSec());
+		ackerman(speedsteer->point.y, speedsteer->point.x, diff_time.toSec());
 
 		// set and publish odometry
 		nav_msgs::Odometry odom;
@@ -128,9 +117,9 @@ class Odometry {
 		pub = nh.advertise<nav_msgs::Odometry>("/odom_topic", 100);
 		pub.publish(odom);
 
-		//ROS_INFO("Received the message [v(l) - v(r) - steer]: [%f - %f - %f]", speed_L->data,speed_R->data,steer->data);
+		//ROS_INFO("Received the message [v - steer]: [%f - %f]", speedsteer->point->y,speedsteer->point->x);
 
-		ROS_INFO("Computed pose (type: %d) [x - y - theta]: [%f - %f - %f]",get_type(),get_x(),get_y(),get_theta()*180/M_PI);
+		ROS_INFO("Computed pose [x - y - theta]: [%f - %f - %f]",get_x(),get_y(),get_theta()*180/M_PI);
 
 		//set the last useful time
 		set_last_time(current_time);
@@ -140,25 +129,16 @@ class Odometry {
 
 int main (int argc, char **argv)
 {
-  ros::init (argc, argv, "project_2");
-  ros::NodeHandle nh;
-  ros::NodeHandle nh_private("~");
-  imu_tools::ComplementaryFilterROS filter(nh, nh_private);
+	ros::init (argc, argv, "project_2");
+	ros::NodeHandle nh;
+	ros::NodeHandle nh_private("~");
+	imu_tools::ComplementaryFilterROS filter(nh, nh_private);
 
-  Odometry odom;
-
-  ros::NodeHandle nh;
-
+	Odometry odom;
+	
 	// subscriber for odometry
-	message_filters::Subscriber<project_1::floatStamped> sub1(nh, "/steer_stamped", 100);
-	message_filters::Subscriber<project_1::floatStamped> sub2(nh, "/speedL_stamped", 100);
+	ros::Subscriber sub = nh.subscribe("/speedsteer", 100, &Odometry::callback, &odom);
 
-	typedef message_filters::sync_policies::ApproximateTime<project_1::floatStamped, project_1::floatStamped, project_1::floatStamped> MySyncPolicy;
-
-	// creation of Synchronizer and relative callback binding
-	message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), sub1, sub2);
-	sync.registerCallback(boost::bind(&Odometry::callback, &odom, _1, _2));
-
-  ros::spin();
-  return 0;
+	ros::spin();
+	return 0;
 }
