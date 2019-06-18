@@ -49,27 +49,27 @@ ComplementaryFilterROS::ComplementaryFilterROS(
   int queue_size = 5;
 
   // Register publishers:
-  imu_publisher_ = nh_.advertise<sensor_msgs::Imu>(ros::names::resolve("imu") + "/data", queue_size);
+  imu_publisher_ = nh_.advertise<sensor_msgs::Imu>("/swiftnav/rear/imu/data", queue_size);
 
   if (publish_debug_topics_)
   {
       rpy_publisher_ = nh_.advertise<geometry_msgs::Vector3Stamped>(
-                  ros::names::resolve("imu") + "/rpy/filtered", queue_size);
+                  "/swiftnav/rear/imu/rpy/filtered", queue_size);
 
       if (filter_.getDoBiasEstimation())
       {
         state_publisher_ = nh_.advertise<std_msgs::Bool>(
-                    ros::names::resolve("imu") + "/steady_state", queue_size);
+                    "/swiftnav/rear/imu/steady_state", queue_size);
       }
   }
 
   // Register IMU raw data subscriber.
-  imu_subscriber_.reset(new ImuSubscriber(nh_, "/imu", queue_size));
+  imu_subscriber_.reset(new ImuSubscriber(nh_, "/swiftnav/rear/imu", queue_size));
 
   // Register magnetic data subscriber.
   if (use_mag_)
   {
-    mag_subscriber_.reset(new MagSubscriber(nh_, ros::names::resolve("imu") + "/mag", queue_size));
+    mag_subscriber_.reset(new MagSubscriber(nh_, "/swiftnav/rear/imu/mag", queue_size));
 
     sync_.reset(new Synchronizer(
         SyncPolicy(queue_size), *imu_subscriber_, *mag_subscriber_));

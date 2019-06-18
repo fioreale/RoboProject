@@ -117,7 +117,7 @@ class Odometry {
 		pub = nh.advertise<nav_msgs::Odometry>("/odom_topic", 100);
 		pub.publish(odom);
 
-		//ROS_INFO("Received the message [v - steer]: [%f - %f]", speedsteer->point->y,speedsteer->point->x);
+		//ROS_INFO("Received the message [v - steer]: [%f - %f]", speedsteer->point.y,speedsteer->point.x);
 
 		ROS_INFO("Computed pose [x - y - theta]: [%f - %f - %f]",get_x(),get_y(),get_theta()*180/M_PI);
 
@@ -135,8 +135,13 @@ int main (int argc, char **argv)
 	imu_tools::ComplementaryFilterROS filter(nh, nh_private);
 
 	Odometry odom;
-	
+
 	// subscriber for odometry
+	//message_filters::Subscriber<geometry_msgs::PointStamped> sub1(nh, "/speedsteer", 100);
+
+	// creation of callback binding
+	//sync.registerCallback(boost::bind(&Odometry::callback, &odom, _1));
+
 	ros::Subscriber sub = nh.subscribe("/speedsteer", 100, &Odometry::callback, &odom);
 
 	ros::spin();
