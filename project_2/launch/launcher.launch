@@ -8,6 +8,8 @@
 
     <node name="ekf_node" pkg="robot_localization" type="ekf_localization_node" clear_params="true">
 
+      <remap from="/odometry/filtered" to="/odom_topic/filtered" />
+
       <param name="frequency" value="30"/>
       <param name="two_d_mode" value="true"/>
 
@@ -87,7 +89,7 @@
 
       <remap from="/imu/data" to="/swiftnav/rear/imu/data" />
       <remap from="/gps/fix" to="/swiftnav/rear/gps" />
-      <remap from="/odometry/filtered" to="/odometry/filtered" />
+      <remap from="/odometry/filtered" to="/odom_topic/filtered" />
       <remap from="/gps/filtered" to="/swiftnav/rear/gps/filtered" />
 
     <rosparam command="load" file="$(find project_2)/params/navsat_transform_param.yaml" />
