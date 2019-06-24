@@ -31,19 +31,15 @@ Inside the archive:
 In order to add the IMU data: 
 1) the node odometry publishes the odometry on odom_topic; 
 2) the imu_tools subscribes to /swiftnav/rear/imu to get the imu data from the bag, adds the orientation and publishes the result on the /swiftnav/rear/imu/data;
-3) the navsat node takes the data from odom_topic and /swiftnav/rear/imu/data, puts them together and publishes the result on /odom_topic/filtered;
+3) the ekf node takes the data from odom_topic and /swiftnav/rear/imu/data, puts them together and publishes the result on /odom_topic/filtered;
 
 In order to add the GPS data:
-1) the ekf_node subscribes to /swiftnav/rear/imu/data and /odom_topic/filtered;
-2) the ekf_node computes the localization and publishes the final result on the /swiftnav/rear/gps/filtered;
+1) the navsat subscribes to /swiftnav/rear/imu/data and swiftnav/rear/gps and /odom_topic/filtered;
+2) the navsat computes the localization and publishes the final result on the /swiftnav/rear/gps/filtered;
 
 Both ekf_node and navsat used other topics to publish data by default, but they have been remapped in the launch file.
 
 -------------------------------------------------------------------------------------------
-
-Custom message used to publish the odometry :
-         string		     odom_type
-	 nav_msgs/Odometry   odom
 
 In the launch file are set the parameters of the ekf_node; between these, the imu0 and odom0 represent the topic from which the node takes the input data (/swiftnav/rear/imu/data and odom_topic respectively) and they are configured to abilitate only the x,y,z, roll, pitch, yaw, vx, vy, vz (for the odom0) and roll, pitch, yaw first derivative or roll and pitch and second derivative of x,y and z (for imu0). 
 
