@@ -29,9 +29,9 @@ Inside the archive:
 
 
 In order to add the IMU data: 
-1) the node odometry publishes the odometry on odom_topic; 
+1) the node odometry publishes the odometry on /odom_topic; 
 2) the imu_tools subscribes to /swiftnav/rear/imu to get the imu data from the bag, adds the orientation and publishes the result on the /swiftnav/rear/imu/data;
-3) the ekf node takes the data from odom_topic and /swiftnav/rear/imu/data, puts them together and publishes the result on /odom_topic/filtered;
+3) the ekf node takes the data from /odom_topic and /swiftnav/rear/imu/data, puts them together and publishes the result on /odom_topic/filtered;
 
 In order to add the GPS data:
 1) the navsat subscribes to /swiftnav/rear/imu/data and swiftnav/rear/gps and /odom_topic/filtered;
@@ -55,19 +55,19 @@ How to execute the code :
 
 	- while the nodes are still running, you can also see graphically the position of the car with mapviz: open mapviz and add navsat in order to see the data on 
 	  /swiftnav/rear/gps/filtered topic.
-	- to see the odometry data corrected with the imu data execute "rostopic echo /odom_topic/filtered ".
+	- to see the odometry data corrected with the imu data execute "rostopic echo /odom_topic/filtered".
 	- to see the gps published on the topic. on a separate terminal source the environment and execute "rostopic echo /swiftnav/rear/gps/filtered".
 
 -------------------------------------------------------------------------------------------
 
 Extra information:
 
-The car frame is placed in the center between the rear wheels; the baseline is oriented along the y axis, while the d axis is oriented along x .
+The car frame is placed in the center between the rear wheels; the baseline is oriented along the y axis, while the d axis is oriented along x.
 We noticed that the car follows a circle.
 
 Structure of the code in odometry.cpp:
 
--definition of the class Odometry, which is used to keep track of last pose (x,y,theta) and of the odometry type ( 0 = differential, 1 = Ackerman); it contains:
+-definition of the class Odometry, which is used to keep track of last pose (x,y,theta); it contains:
 
 	-the methods for the computation of the Ackerman odometry
 	-the callback method, used to select the odometry, compute the new position and publish the result on the odom_topic
