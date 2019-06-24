@@ -34,7 +34,7 @@ In order to add the IMU data:
 3) the navsat node takes the data from odom_topic and /swiftnav/rear/imu/data, puts them together and publishes the result on /odom_topic/filtered;
 
 In order to add the GPS data:
-1) the ekf_node subscribes to /swiftnav/rear/imu/data, /swiftnav/rear/gps (gps raw data are published here from the bag) and /odom_topic/filtered;
+1) the ekf_node subscribes to /swiftnav/rear/imu/data and /odom_topic/filtered;
 2) the ekf_node computes the localization and publishes the final result on the /swiftnav/rear/gps/filtered;
 
 Both ekf_node and navsat used other topics to publish data by default, but they have been remapped in the launch file.
