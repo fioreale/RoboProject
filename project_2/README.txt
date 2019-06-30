@@ -16,14 +16,11 @@ Inside the archive:
 
 --> project_2: the package of the project, that contains:
 	
-	- src folder: the source code complementary_filter.cpp , complementary_filter_ros.cpp (used to handle the IMU data) and the odometry.cpp file, that computes the odometry
+	- src folder: the source code odometry.cpp file, that computes the odometry
 
-	- params folder: contains the navsat_transform_param.yaml file that is used by the navsat_transformation_node 
+	- params folder: contains the navsat_transform_param.yaml file that is used by the navsat_transform_node 
 	
 	- launch folder: contains the launch file; this one is used to run the ekf_node (that computes the localization with the EKF filter) and the navsat transformation node (that puts 				 together the imu data and the odometry)
-
-	- include folder: contains the headers of the complementary filters source code
-	
 
 --> this README.txt file
 
@@ -43,7 +40,7 @@ Both ekf_node and navsat used other topics to publish data by default, but they 
 
 In the launch file are set the parameters of the ekf_node; between these, the imu0 and odom0 represent the topic from which the node takes the input data (/swiftnav/rear/imu/data and odom_topic respectively) and they are configured to abilitate only the x,y,z, roll, pitch, yaw, vx, vy, vz (for the odom0) and roll, pitch, yaw first derivative or roll and pitch and second derivative of x,y and z (for imu0). 
 
-In the navsat_transform_param file, instead is set the frequency of spinning (30 Hz) , the magnetic_declination_radians (that depends on the geographical position); the yaw_offset, set to 180, has been found through the GPS raw data.
+In the navsat_transform_param file, instead is set the frequency of spinning (30 Hz) , the magnetic_declination_radians (that depends on the geographical position); the yaw_offset (set to 180), has been found through the raw GPS data.
 
 -------------------------------------------------------------------------------------------
 
@@ -52,9 +49,7 @@ Instructions:
 How to execute the code :
 	- run the bag
 	- in a separate terminal, run the launch file ("roslaunch project_2 launcher.launch")
-
-	- while the nodes are still running, you can also see graphically the position of the car with mapviz: open mapviz and add navsat in order to see the data on 
-	  /swiftnav/rear/gps/filtered topic.
+	- while the nodes are still running, you can also see graphically the position of the car with mapviz: open mapviz and add navsat in order to see the data on /swiftnav/rear/gps/filtered topic.
 	- to see the odometry data corrected with the imu data execute "rostopic echo /odom_topic/filtered".
 	- to see the gps published on the topic. on a separate terminal source the environment and execute "rostopic echo /swiftnav/rear/gps/filtered".
 
@@ -72,9 +67,6 @@ Structure of the code in odometry.cpp:
 	-the methods for the computation of the Ackerman odometry
 	-the callback method, used to select the odometry, compute the new position and publish the result on the odom_topic
 
--definition of the main function, in which is created a subscriber to /speedsteer to read the information about the steering angle and the velocity used to compute the Ackerman odometry; here the imu_tools are declared too.
-
-
-
+-definition of the main function, in which is created a subscriber to /speedsteer to read the information about the steering angle and the velocity used to compute the Ackerman odometry.
 
 

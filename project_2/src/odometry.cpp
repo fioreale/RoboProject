@@ -1,7 +1,8 @@
 #include "ros/ros.h"
 #include "message_filters/subscriber.h"
 #include "nav_msgs/Odometry.h"
-#include "imu_complementary_filter/complementary_filter_ros.h"
+#include "geometry_msgs/PointStamped.h"
+#include <tf/transform_datatypes.h>
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -131,16 +132,8 @@ int main (int argc, char **argv)
 {
 	ros::init (argc, argv, "project_2");
 	ros::NodeHandle nh;
-	ros::NodeHandle nh_private("~");
-	imu_tools::ComplementaryFilterROS filter(nh, nh_private);
 
 	Odometry odom;
-
-	// subscriber for odometry
-	//message_filters::Subscriber<geometry_msgs::PointStamped> sub1(nh, "/speedsteer", 100);
-
-	// creation of callback binding
-	//sync.registerCallback(boost::bind(&Odometry::callback, &odom, _1));
 
 	ros::Subscriber sub = nh.subscribe("/speedsteer", 100, &Odometry::callback, &odom);
 
